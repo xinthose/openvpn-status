@@ -5,7 +5,7 @@
         <v-data-table
           :headers="headers"
           :items="events"
-          :rows-per-page-items="[25,50,{text:'All',value:-1}]"
+          :rows-per-page-items="[10,25,{text:'All',value:-1}]"
           :total-items="total"
           :pagination.sync="pagination"
           :loading="loading"
@@ -13,14 +13,9 @@
           >
           <template slot="items" slot-scope="props">
             <td>
-              <v-tooltip right>
-                <v-icon slot="activator" :style="`color:${eventColor(props.item)};`">{{ eventIcon(props.item) }}</v-icon>
-                <span>{{ props.item.event }}</span>
-              </v-tooltip>
+              <v-icon :title="props.item.event" :style="`color:${eventColor(props.item)};`">{{ eventIcon(props.item) }}</v-icon>
             </td>
             <td class="text-xs-center">{{ props.item.node }}</td>
-            <td class="text-xs-center">{{ props.item.vpn }}</td>
-            <td class="text-xs-center"><a :href="`http://geoiplookup.net/ip/${props.item.pub}`" target="_blank">{{ props.item.pub }}</a></td>
             <td class="text-xs-center">{{ eventTime(props.item) }}</td>
           </template>
         </v-data-table>
@@ -30,88 +25,89 @@
 </template>
 
 <script>
-import moment from 'moment'
-import {mapState} from 'vuex'
-import store from '../store'
-
-export default {
-  name: 'events',
-  data() {
-    return {
-      debounce: false,
-      pagination: {},
-      headers: [{
-        sortable: false,
-        width: '50px'
-      }, {
-        text: 'Node',
-        align: 'center',
-        sortable: false,
-        value: 'node'
-      }, {
-        text: 'VPN IP',
-        align: 'center',
-        sortable: false,
-        value: 'vpn'
-      }, {
-        text: 'Public IP',
-        align: 'center',
-        sortable: false,
-        value: 'pub'
-      }, {
-        text: 'Time',
-        align: 'center',
-        sortable: false,
-        value: 'time'
-      }]
-    }
-  },
-  computed: mapState({
-    dateFormat: state => state.config.dateFormat,
-    loading: 'eventsLoading',
-    search: 'search',
-    events: 'events',
-    total: 'total',
-    server: 'server'
-  }),
-  mounted() {
-    store.dispatch('changePage', {page: 0, size: 25})
-  },
-  methods: {
-    eventTime(event) {
-      return moment(event.timestamp * 1000).format(this.dateFormat)
+  import moment from 'moment'
+  export default {
+    name: 'events',
+    data() { 
+      return {
+        debounce: false,
+        pagination: {},
+        headers: [{
+          sortable: false,
+          width: '50px'
+        },{
+          text: 'Node',
+          align: 'center',
+          sortable: false,
+          value: 'node'
+        },{
+          text: 'Time',
+          align: 'center',
+          sortable: false,
+          value: 'time'
+        }]
+      }
     },
-    eventIcon(event) {
-      const map = new Map([['connect', 'fa-plug'], ['disconnect', 'fa-times'], ['reconnect', 'fa-redo']])
-      return map.get(event.event) || 'fa-question'
-    },
-    eventColor(event) {
-      const map = new Map([['connect', '#28ba0e'], ['disconnect', '#c11919'], ['reconnect', '#4221a5']])
-      return map.get(event.event) || '#f27609'
-    }
-  },
-  watch: {
-    pagination: {
-      handler() {
-        const { page, rowsPerPage } = this.pagination
-        store.dispatch('changePage', {page, size: rowsPerPage})
+    computed: {
+      loading() {
+        return this.$store.state.clientsLoading
       },
-      deep: true
+      search() {
+        return this.$store.state.search
+      },
+      events () {
+        return this.$store.state.events
+      },
+      total () {
+        return this.$store.state.total
+      },
+      server () {
+        return this.$store.state.server
+      }
     },
-    search() {
-      if (this.debounce)
-        clearTimeout(this.debounce)
-      this.debounce = setTimeout(() => {
+    methods: {
+      eventTime(event) {
+        return moment(event.timestamp * 1000).format('HH:mm - DD.MM.YY')
+      },
+      eventIcon(event) {
+        switch (event.event) {
+          case 'connect': return 'fa-plug'
+          case 'disconnect': return 'fa-times'
+          case 'reconnect': return 'fa-repeat'
+          default: return 'fa-question'
+        }
+      },
+      eventColor(event) {
+        switch (event.event) {
+          case 'connect': return '#28ba0e'
+          case 'disconnect': return '#c11919'
+          case 'reconnect': return '#4221a5'
+          default: return '#f27609'
+        }
+      }
+    },
+    watch: {
+      pagination: {
+        handler () {
+          const { page, rowsPerPage } = this.pagination
+          this.$store.dispatch('changePage',{page:page,size:rowsPerPage})
+        },
+        deep: true
+      },
+      search(value) {
+        if (this.debounce)
+          clearTimeout(this.debounce)
+        this.debounce = setTimeout(() => {
+          const { page, rowsPerPage } = this.pagination
+          this.$store.dispatch('changePage',{page:page,size:rowsPerPage})
+          this.debounce = false
+        }, 300)
+      },
+      server: function (value) {
+        this.pagination.page = 1
         const { page, rowsPerPage } = this.pagination
-        store.dispatch('changePage', {page, size: rowsPerPage})
-        this.debounce = false
-      }, 300)
-    },
-    server() {
-      this.pagination.page = 1
-      const { page, rowsPerPage } = this.pagination
-      store.dispatch('changePage', {page, size: rowsPerPage})
+        this.$store.dispatch('changePage',{page:page,size:rowsPerPage})
+      }
     }
   }
-}
 </script>

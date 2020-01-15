@@ -1,5 +1,6 @@
 {
   "port": 3013,
-  "servers": [{"name": "Server","host": "127.0.0.1","man_port": 7656}],
-  "ipFile": "./GeoLite2-City.mmdb",
+  "bind": "0.0.0.0",
+  "servers": [{"name": "OpenVPN Status Server"}],
+  "ipFile": "./GeoLite2-City.mmdb"
 }
