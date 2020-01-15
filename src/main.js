@@ -26,6 +26,7 @@ new Vue({
     $route(to) {
       try {
         const srvId = parseInt(to.params.id, 10)
+        store.commit('changeView', {view: to.params.view})
         store.dispatch('changeServer', {server: srvId})
       } catch (e) {
         console.error(e)
@@ -53,7 +54,10 @@ new Vue({
           time: response.data.time
         })
       })
-    // eslint-disable-next-line
+    axios.get('./cfg')
+      .then(response => {
+        store.commit('updateConfig', response.data)
+      })
     const socket = new ReconnectingWebSocket(`${window.location.origin.replace('http', 'ws')}/live/log`)
     const handleMsg = msg => {
       if (msg.server !== store.state.server)

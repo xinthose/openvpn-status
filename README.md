@@ -3,22 +3,26 @@
 A web-based application to monitor (multiple) [OpenVPN](https://openvpn.net/index.php/open-source/overview.html) servers.
 
 Features
-* WebSocket based real-time events
-* Persistent event log
-* Full material design
 * Multi server support
-* Mobile friendly
+* WebSocket based real-time events
+* Map view
 * Disconnect clients remotely
+* Persistent event log
+* Mobile friendly
+* Full material design
 
 ### Client panel
 ![Client panel](https://raw.githubusercontent.com/AuspeXeu/openvpn-status/master/clients.png)
+
+### Map view
+![Map view](https://raw.githubusercontent.com/AuspeXeu/openvpn-status/master/map.png)
 
 ### Event panel
 ![Event panel](https://raw.githubusercontent.com/AuspeXeu/openvpn-status/master/events.png)
 
 ## Pre-requisites
 
-- [x] [NodeJS](https://nodejs.org/en/download/) 6 or higher
+- [x] [NodeJS](https://nodejs.org/en/download/) 10 or higher
 - [x] npm package manager
 
 # Installation
@@ -37,7 +41,7 @@ sudo npm install pm2 -g
 
 ### 3. Configuration
 
-The configuration is handled in the ``cfg.json`` file.
+The configuration is located in ``cfg.json``.
 
 | Option   | Default       | Description  |
 | -------- |:-------------:| ------------ |
@@ -46,11 +50,7 @@ The configuration is handled in the ``cfg.json`` file.
 | servers  | `[{"name": "Server","host": "127.0.0.1","man_port": 7656}]` | Array of servers. |
 | username | `admin` | User for basic HTTP authentication. Change to `''` or `false` to disable. |
 | password | `admin` | Password for basic HTTP authentication. |
-
-#### public/cfg.json
-
-* date_format: `HH:mm - DD.MM.YY` 
-  * Date format on webpage ([click here for options](http://momentjs.com/docs/#/displaying/format/))
+| web.dateFormat | `HH:mm:ss - DD.MM.YY` | DateTime format used in the web frontend ([options](http://momentjs.com/docs/#/displaying/format/)).|
 
 Example:
 ```
@@ -63,6 +63,9 @@ Example:
   ],
   "username": "admin",
   "password": "YV3qSTxD",
+  "web": {
+    "dateFormat": "HH:mm - DD.MM.YY"
+  }
 }
 ```
 
@@ -71,7 +74,7 @@ Example:
 Add the following line to your configuration file, e.g., `server.conf`. This will start the management console on port `7656` and make it accessible on `127.0.0.1`, i.e. this machine.
 
 ```
-management 127.0.0.1 7656 //As specified in cfg.json for this server
+management 127.0.0.1 7656 // As specified in cfg.json for this server
 ```
 
 Restart your OpenVPN server.
@@ -83,19 +86,37 @@ Before the application is ready to run, the frontend needs to be built. This is 
 ``npm run build``
 
 # Run
+This makes the application available on http://127.0.0.1:3013.
 
 ### Manually
 ```
 node server.js
 ```
 
-### As service
+### As PM2 service
 ```
 pm2 start pm2.json
 pm2 save
 ```
 
-This makes the application available on http://127.0.0.1:3013.
+### As Systemd service
+
+```
+[Unit]
+Description=OpenVPN Status
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/home/pi/backend \\ Adjust this
+ExecStart=/usr/local/bin/node server.js
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+
+```
 
 ## (optional) Running the service behind nginx as a reverse proxy
 
@@ -122,20 +143,10 @@ server {
 
 - **3013**
 
-### Environment variables
-
-| Variable | Description | Default value |
-| -------- | ----------- | ------------- |
-| **AUTH_USERNAME** | HTTP AUTH username | admin
-| **AUTH_PASSWORD** | HTTP AUTH password | admin
-| **VPN_NAME** | Name of the VPN | Server
-| **VPN_HOST** | Host of the VPN | openvpn
-| **VPN_MAN_PORT** | Management port | 7656
-
 ### Docker-compose.yml
 
 ```yml
-# Full example :
+# Full example:
 # https://raw.githubusercontent.com/AuspeXeu/openvpn-status/master/docker-compose.sample.yml
 
 openvpn-status:
@@ -143,16 +154,8 @@ openvpn-status:
   container_name: openvpn-status
   ports:
     - 8080:3013
-  environment:
-    - AUTH_USERNAME=admin
-    - AUTH_PASSWORD=YV3qSTxD
-    - VPN_NAME="Remote employees"
-    - VPN_HOST=openvpn
-    - VPN_MAN_PORT=7656
-  links:
-    - openvpn
-  depends_on:
-    - openvpn
+  volumes:
+    - './status-cfg/cfg.json:/usr/src/app/cfg.json'
   restart: "unless-stopped"
 ```
 

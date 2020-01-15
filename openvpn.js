@@ -1,6 +1,17 @@
 const {EventEmitter} = require('events')
 const net = require('net')
 
+const mkClient = client => ({
+  cid: client['Client ID'],
+  cn: client['Common Name'] || client.Username,
+  connected: client['Connected Since (time_t)'],
+  seen: client['Last Ref (time_t)'],
+  pub: client['Real Address'].split(':')[0],
+  vpn: client['Virtual Address'],
+  received: client['Bytes Received'],
+  sent: client['Bytes Sent']
+})
+
 const STATE = {idle: Symbol('idle'), status: Symbol('status')}
 let oldClients
 class client extends EventEmitter {
@@ -21,8 +32,8 @@ class client extends EventEmitter {
     })
     this.socket.on('error', () => {
       this.connected = false
-      console.log('Could not connect to management console, retrying in 60s')
-      setTimeout(() => this.connect(), 60 * 1000)
+      console.log('Could not connect to management console, retrying in 10s')
+      setTimeout(() => this.connect(), 10 * 1000)
     })
     this.connect()
   }
@@ -31,10 +42,13 @@ class client extends EventEmitter {
     const prepProperty = val => {
       if (!val)
         return undefined
+
       if (val.match(/^[0-9]+$/))
         return parseInt(val, 10)
+
       if (val === 'UNDEF')
         return undefined
+
       return val
     }
 
@@ -49,8 +63,13 @@ class client extends EventEmitter {
       const props = data.split('\t').slice(1, data.length + 1)
       const vpnClient = {}
       this.clientProps.forEach((prop, idx) => vpnClient[prop] = prepProperty(props[idx]))
-      if ((vpnClient['Common Name'] && vpnClient['Common Name'].length) || (vpnClient.Username && vpnClient.Username.length))
+      if ((vpnClient['Common Name'] && vpnClient['Common Name'].toString().length) || (vpnClient.Username && vpnClient.Username.toString().length))
         this.clients.set(vpnClient['Client ID'], vpnClient)
+
+      if (this.clientRes) {
+        this.clientRes(Array.from(this.clients.values()).map(itm => mkClient(itm)))
+        this.clientRes = false
+      }
     } else if (data.startsWith('ROUTING_TABLE') && this.state === STATE.status) {
       const props = data.split('\t').slice(1, data.length + 1)
       this.clients.forEach(vpnClient => {
@@ -60,12 +79,8 @@ class client extends EventEmitter {
     } else if (data.startsWith('END') && this.state === STATE.status) {
       oldClients.forEach((vpnClient, clientId) => {
         if (!this.clients.has(clientId) && (vpnClient['Common Name'].length || vpnClient.Username.length))
-          this.emit('client-disconnect', vpnClient)
+          this.emit('client-disconnect', mkClient(vpnClient))
       })
-      if (this.clientRes) {
-        this.clientRes(Array.from(this.clients.values()))
-        this.clientRes = false
-      }
       this.state = STATE.idle
     } else if (data.startsWith('>BYTECOUNT_CLI') && this.state === STATE.idle) {
       const [_, clientId, received, sent] = data.match(/>BYTECOUNT_CLI:([0-9]+),([0-9]+),([0-9]+)/).map(itm => parseInt(itm, 10))
@@ -73,19 +88,19 @@ class client extends EventEmitter {
         const vpnClient = this.clients.get(clientId)
         vpnClient['Bytes Received'] = received
         vpnClient['Bytes Sent'] = sent
-        this.emit('client-update', vpnClient)
+        this.emit('client-update', mkClient(vpnClient))
       }
     } else if (data.startsWith('>CLIENT:ESTABLISHED') && this.state === STATE.idle) {
       const [_, clientId] = data.split(',').map(itm => parseInt(itm, 10))
       setTimeout(() => {
         this.getClients().then(() => {
-          this.emit('client-connect', this.clients.get(clientId))
+          this.emit('client-connect', mkClient(this.clients.get(clientId)))
         })
       }, 2000)
     } else if (data.startsWith('>CLIENT:DISCONNECT') && this.state === STATE.idle) {
       const [_, clientId] = data.split(',').map(itm => parseInt(itm, 10))
       if (this.clients.has(clientId)) {
-        this.emit('client-disconnect', this.clients.get(clientId))
+        this.emit('client-disconnect', mkClient(this.clients.get(clientId)))
         this.clients.delete(clientId)
       }
     }
@@ -96,7 +111,9 @@ class client extends EventEmitter {
       this.socket.connect(this.port, this.host, () => {
         if (!this.alive)
           this.alive = setInterval(() => this.getClients(), 5000)
+
         this.socket.write('bytecount 5\r\n')
+        console.log('Connected to management console')
         resolve()
       })
     })
@@ -106,13 +123,15 @@ class client extends EventEmitter {
     const clt = this.clients.get(cid)
     if (!clt)
       return
+
     this.socket.write(`client-kill ${cid}`)
-    this.emit('client-disconnect', clt)
+    this.emit('client-disconnect', mkClient(clt))
   }
 
   getClients() {
     if (!this.connected)
       return
+
     return this.connected.then(() => {
       const res = new Promise(resolve => this.clientRes = resolve)
       this.socket.write('status 3\r\n')

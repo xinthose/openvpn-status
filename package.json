@@ -2,13 +2,18 @@
   "name": "openvpn-status",
   "homepage": "https://github.com/AuspeXeu/openvpn-status",
   "description": "A web-based application to monitor clients connected to an openvpn server.",
-  "version": "4.1.16",
+  "version": "4.2.12",
   "license": "MIT",
   "main": "server.js",
   "author": {
     "name": "Christian Vaas",
     "email": "christianvaas@auspex.eu",
     "url": "https://auspex.eu"
+  },
+  "husky": {
+    "hooks": {
+      "pre-push": "npm run deps && npm run ncu && npm run lint"
+    }
   },
   "keywords": [
     "OpenVPN",
@@ -25,37 +30,42 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "deps": "depcheck . --ignores=\"husky,sqlite3,@vue/cli-plugin-babel,@vue/cli-plugin-eslint,@vue/eslint-config-airbnb,vue-cli-plugin-vuetify\"",
+    "ncu": "ncu"
   },
   "dependencies": {
-    "vue": "^2.5.21",
-    "vue-router": "^3.0.2",
-    "vuetify": "^1.3.15",
-    "vuex": "^3.0.1",
-    "axios": "^0.18.0",
-    "body-parser": "^1.18.3",
-    "cron": "^1.6.0",
-    "express": "^4.16.4",
-    "maxmind": "^2.11.1",
-    "moment": "^2.23.0",
-    "nconf": "^0.10.0",
-    "request": "^2.88.0",
-    "sequelize": "^4.42.0",
-    "sqlite3": "^4.0.4",
-    "uuid": "^3.3.2",
-    "ws": "^6.1.2",
-    "@babel/polyfill": "^7.2.5"
+    "@babel/polyfill": "7.4.4",
+    "axios": "0.19.0",
+    "body-parser": "1.19.0",
+    "cron": "1.7.1",
+    "express": "4.17.1",
+    "maxmind": "3.0.4",
+    "moment": "2.24.0",
+    "nconf": "0.10.0",
+    "request": "2.88.0",
+    "sequelize": "^5.21.3",
+    "sqlite3": "4.0.9",
+    "uuid": "3.3.2",
+    "vue": "2.6.10",
+    "vue-router": "3.0.6",
+    "vuetify": "1.5.14",
+    "vuex": "3.1.1",
+    "ws": "7.0.0"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "^3.2.0",
-    "@vue/cli-plugin-eslint": "^3.2.1",
-    "@vue/cli-service": "^3.2.0",
-    "@vue/eslint-config-airbnb": "^4.0.0",
-    "vue-cli-plugin-vuetify": "^0.4.6",
-    "vue-template-compiler": "^2.5.21"
+    "@vue/cli-plugin-babel": "3.8.0",
+    "@vue/cli-plugin-eslint": "3.8.0",
+    "@vue/cli-service": "3.8.4",
+    "@vue/eslint-config-airbnb": "4.0.0",
+    "depcheck": "0.8.1",
+    "husky": "2.4.1",
+    "npm-check-updates": "3.1.10",
+    "vue-cli-plugin-vuetify": "0.5.0",
+    "vue-template-compiler": "2.6.10"
   },
   "engines": {
-    "node": ">= 6.0.0",
+    "node": ">= 10.0.0",
     "npm": ">= 3.0.0"
   },
   "browserslist": [

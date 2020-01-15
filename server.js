@@ -25,6 +25,7 @@ if (conf.get('username') && conf.get('username').length)
   })
 
 app.get('/', (req, res) => res.sendFile(`${__dirname}/dist/index.html`))
+app.get('/cfg', (req, res) => res.json(conf.get('web')))
 app.use('/', express.static(`${__dirname}/dist`))
 app.use(bodyParser.json())
 
@@ -33,55 +34,46 @@ const clientUpdates = new Map()
 const clients = new Map()
 const servers = conf.get('servers') || []
 const broadcast = data => clients.forEach(ws => ws.send(JSON.stringify(data)))
-const eventBuffer = {}
-const logEvent = data => {
-  const hash = `${data.server}_${data.node}_${data.timestamp}`
-  if (!eventBuffer[hash])
-    eventBuffer[hash] = 1
-  else
-    eventBuffer[hash] += 1
-  if (eventBuffer[hash] === 1)
-    setTimeout(() => {
-      db.Log.findOne({
-        where: {
-          server: data.server,
-          node: data.node,
-          timestamp: {[db.op.between]: [data.timestamp - 60, data.timestamp + 60]}
-        }
-      })
-        .then(entry => {
-          // Another event of the same node is in the buffer or we found an old event
-          if (!entry && eventBuffer[hash] === 1)
-            db.Log.create(data).then(nEntry => broadcast(Object.assign(nEntry, data)))
-          else if (!entry && eventBuffer[hash] > 1 && servers[data.server].entries.find(cl => cl.cid === data.cid)) {
-            data.event = 'reconnect'
-            db.Log.create(data).then(nEntry => broadcast(Object.assign(nEntry, data)))
-          } else if (entry && servers[data.server].entries.find(cl => cl.cid === data.cid)) {
-            Object.assign(entry, data)
-            entry.event = 'reconnect'
-            entry.save().then(() => broadcast(entry))
-          }
-          eventBuffer[hash] = 0
+let logMutex = Promise.resolve()
+const logEvent = event => {
+  const logic = data => new Promise(resolve => {
+    db.Log.findOne({
+      where: {
+        server: data.server,
+        node: data.node,
+        timestamp: {[db.op.between]: [data.timestamp - 60, data.timestamp + 60]}
+      },
+      order: [['timestamp', 'DESC']]
+    }).then(entry => {
+      if (!entry)
+        db.Log.create(data).then(() => {
+          broadcast(data)
+          resolve()
         })
-    }, 2000)
+      else {
+        if ((entry.event === 'disconnect' || entry.event === 'reconnect') && data.event === 'connect') {
+          entry.event = 'reconnect'
+          data.event = 'reconnect'
+          entry.timestamp = moment().unix()
+          entry.save().then(resolve)
+        } else
+          db.Log.create(data).then(resolve)
+        broadcast(data)
+      }
+    })
+  })
+  logMutex.then(() => logMutex = logic(event))
 }
 const clientToEntry = client => {
-  const obj = {
-    cid: client['Client ID'],
-    node: client['Common Name'] || client.Username,
-    connected: client['Connected Since (time_t)'],
-    seen: client['Last Ref (time_t)'],
-    pub: client['Real Address'].split(':')[0],
-    vpn: client['Virtual Address'],
-    received: client['Bytes Received'],
-    sent: client['Bytes Sent']
-  }
-  const loc = cityLookup(obj.pub)
+  const loc = cityLookup(client.pub)
+  client.node = client.cn
   if (loc) {
-    obj.country_code = loc.country.iso_code
-    obj.country_name = loc.country.names.en
+    client.country_code = loc.country.iso_code
+    client.country_name = loc.country.names.en
+    client.lat = loc.location.latitude
+    client.lon = loc.location.longitude
   }
-  return obj
+  return client
 }
 
 const validateNumber = n => Number.isFinite(parseFloat(n, 10))

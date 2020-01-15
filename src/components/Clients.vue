@@ -51,7 +51,7 @@
 import moment from 'moment'
 import axios from 'axios'
 import {mapState} from 'vuex'
-import config from '../../public/cfg.json'
+import store from '../store'
 
 export default {
   name: 'clients',
@@ -91,7 +91,7 @@ export default {
       return moment.duration(moment().diff(moment(since * 1000))).humanize()
     },
     formatTime(ts) {
-      return moment(ts * 1000).format(config.date_format)
+      return moment(ts * 1000).format(this.dateFormat)
     },
     flagTitle(node) {
       return (node.country_code ? node.country_name : 'Unknown Country')
@@ -117,7 +117,11 @@ export default {
       })
     }
   },
+  mounted() {
+    store.dispatch('loadClients')
+  },
   computed: mapState({
+    dateFormat: state => state.config.dateFormat,
     severId: 'server',
     updateNode: 'updateNode',
     loading: 'clientsLoading',

@@ -5,7 +5,7 @@
         <v-data-table
           :headers="headers"
           :items="events"
-          :rows-per-page-items="[10,25,{text:'All',value:-1}]"
+          :rows-per-page-items="[25,50,{text:'All',value:-1}]"
           :total-items="total"
           :pagination.sync="pagination"
           :loading="loading"
@@ -18,12 +18,9 @@
                 <span>{{ props.item.event }}</span>
               </v-tooltip>
             </td>
-            <td class="text-xs-center">
-              <v-tooltip bottom :disabled="!props.item.vpn">
-                <span slot="activator">{{ props.item.node }}</span>
-                <span>{{ props.item.pub }} > {{ props.item.vpn }}</span>
-              </v-tooltip>
-            </td>
+            <td class="text-xs-center">{{ props.item.node }}</td>
+            <td class="text-xs-center">{{ props.item.vpn }}</td>
+            <td class="text-xs-center"><a :href="`http://geoiplookup.net/ip/${props.item.pub}`" target="_blank">{{ props.item.pub }}</a></td>
             <td class="text-xs-center">{{ eventTime(props.item) }}</td>
           </template>
         </v-data-table>
@@ -36,7 +33,6 @@
 import moment from 'moment'
 import {mapState} from 'vuex'
 import store from '../store'
-import config from '../../public/cfg.json'
 
 export default {
   name: 'events',
@@ -53,6 +49,16 @@ export default {
         sortable: false,
         value: 'node'
       }, {
+        text: 'VPN IP',
+        align: 'center',
+        sortable: false,
+        value: 'vpn'
+      }, {
+        text: 'Public IP',
+        align: 'center',
+        sortable: false,
+        value: 'pub'
+      }, {
         text: 'Time',
         align: 'center',
         sortable: false,
@@ -61,15 +67,19 @@ export default {
     }
   },
   computed: mapState({
-    loading: 'clientsLoading',
+    dateFormat: state => state.config.dateFormat,
+    loading: 'eventsLoading',
     search: 'search',
     events: 'events',
     total: 'total',
     server: 'server'
   }),
+  mounted() {
+    store.dispatch('changePage', {page: 0, size: 25})
+  },
   methods: {
     eventTime(event) {
-      return moment(event.timestamp * 1000).format(config.date_format)
+      return moment(event.timestamp * 1000).format(this.dateFormat)
     },
     eventIcon(event) {
       const map = new Map([['connect', 'fa-plug'], ['disconnect', 'fa-times'], ['reconnect', 'fa-redo']])
